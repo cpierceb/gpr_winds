@@ -44,12 +44,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 from cmcrameri import cm as cmc
+from sklearn.decomposition import PCA
 from gpr_0_model import (
     SOURCE_MAP, N_SOURCES, KERNEL_COLS, MEAN_COLS,
-    morph_dims, forcing_dims, zust_idx, z_idx, z0_idx, zd_idx, H_idx,
+    morph_dims, forcing_dims,
     PerSourceNoiseLikelihood, WindGP, build_model, load_model,
 )
-
 # =============================================================================
 # CONFIG
 # =============================================================================
@@ -64,7 +64,7 @@ LR          = 0.1
 PRINT_EVERY = 100
 PATIENCE    = 200   # stop if no improvement over this many iters
 MIN_DELTA   = 1e-4  # minimum improvement to count
-
+N_PCA_COMPONENTS = 5
 
 
 N_RESTARTS  = 1     # number of random restarts per LOO fold
@@ -85,7 +85,7 @@ df_obs   = obs_obj['df'].copy()
 df_train = train_obj['df'].copy()
 meta     = train_obj['meta']
 
-USE_SOURCES = ['station', 'urban_tales', 'street_network']
+USE_SOURCES = ['station', 'urban_tales']#, 'street_network']
 FEAT_COLS = meta['feat_cols']
 TARGET    = meta['target_col']
 N_FEAT    = len(FEAT_COLS)
@@ -115,32 +115,45 @@ print(f"df_train  : {len(df_train)} rows  "
 
 
 
-def fit_and_predict(df_tr, df_te, df_obs_station):
+def fit_and_predict(df_tr, df_te, df_obs_station, n_pca=N_PCA_COMPONENTS):
     # Drop any rows with NaNs in required columns before building tensors
     required_cols = KERNEL_COLS + MEAN_COLS
     df_tr          = df_tr.dropna(subset=required_cols).copy()
     df_te          = df_te.dropna(subset=required_cols).copy()
     df_obs_station = df_obs_station.dropna(subset=required_cols).copy()
     
-    y_tr = df_tr[TARGET].values.astype(np.float32)
-
     Xk_tr  = df_tr[KERNEL_COLS].values.astype(np.float32)
     Xk_te  = df_te[KERNEL_COLS].values.astype(np.float32)
     Xk_obs = df_obs_station[KERNEL_COLS].values.astype(np.float32)
+
+    scaler = StandardScaler()
+    Xk_tr_s  = scaler.fit_transform(Xk_tr)
+    Xk_te_s  = scaler.transform(Xk_te)
+    Xk_obs_s = scaler.transform(Xk_obs)
+
+    n_components = min(n_pca, Xk_tr_s.shape[1], Xk_tr_s.shape[0])
+    pca = PCA(n_components=n_components)
+    Xk_tr_pca  = pca.fit_transform(Xk_tr_s)
+    Xk_te_pca  = pca.transform(Xk_te_s)
+    Xk_obs_pca = pca.transform(Xk_obs_s)
+
+    print(f"  PCA: {Xk_tr_s.shape[1]} → {n_components} components  "
+          f"(explained variance: {pca.explained_variance_ratio_.cumsum()[-1]:.3f})")
+
 
     Xm_tr  = df_tr[MEAN_COLS].values.astype(np.float32)
     Xm_te  = df_te[MEAN_COLS].values.astype(np.float32)
     Xm_obs = df_obs_station[MEAN_COLS].values.astype(np.float32)
 
-    scaler   = StandardScaler()
-    Xk_tr_s  = scaler.fit_transform(Xk_tr)
-    Xk_te_s  = scaler.transform(Xk_te)
-    Xk_obs_s = scaler.transform(Xk_obs)
+    Xm_tr  = df_tr[MEAN_COLS].values.astype(np.float32)
+    Xm_te  = df_te[MEAN_COLS].values.astype(np.float32)
+    Xm_obs = df_obs_station[MEAN_COLS].values.astype(np.float32)
 
-    X_tr      = np.concatenate([Xk_tr_s, Xm_tr],  axis=1)
-    X_te      = np.concatenate([Xk_te_s, Xm_te],  axis=1)
-    X_obs_all = np.concatenate([Xk_obs_s, Xm_obs], axis=1)
+    X_tr      = np.concatenate([Xk_tr_pca,  Xm_tr],  axis=1)
+    X_te      = np.concatenate([Xk_te_pca,  Xm_te],  axis=1)
+    X_obs_all = np.concatenate([Xk_obs_pca, Xm_obs], axis=1)
 
+    y_tr = df_tr[TARGET].values.astype(np.float32)
     train_x   = torch.tensor(X_tr,      dtype=torch.float32)
     train_y   = torch.tensor(y_tr,      dtype=torch.float32)
     test_x    = torch.tensor(X_te,      dtype=torch.float32)
@@ -166,7 +179,7 @@ def fit_and_predict(df_tr, df_te, df_obs_station):
     for restart in range(N_RESTARTS):
         print(f"  Restart {restart + 1}/{N_RESTARTS} …")
 
-        model, likelihood = build_model(train_x, train_y, noise_tr, source_idx)
+        model, likelihood = build_model(train_x, train_y, noise_tr, source_idx, n_pca=n_components)
         model.train(); likelihood.train()
         optimizer = Adam(model.parameters(), lr=LR)
         mll       = ExactMarginalLogLikelihood(likelihood, model)
@@ -234,12 +247,7 @@ def fit_and_predict(df_tr, df_te, df_obs_station):
 # PART 5 — Hyperparameters
 # =============================================================================
 
-def extract_hyperparameters(model, likelihood):
-    morph_ls   = model.k_morph.base_kernel.lengthscale.detach().squeeze().numpy()
-    forcing_ls = model.k_forcing.base_kernel.lengthscale.detach().squeeze().numpy()
-    morph_names   = [FEAT_COLS[i] for i in morph_dims]
-    forcing_names = [FEAT_COLS[i] for i in forcing_dims]
-
+def extract_hyperparameters(model, likelihood, n_pca=None):
     hp = {
         'mean_kap_inv': model.mean_module.kap_inv.detach().item(),
         'mean_b':       model.mean_module.b.detach().item(),
@@ -250,18 +258,22 @@ def extract_hyperparameters(model, likelihood):
         'mean_alpha':   model.mean_module.alpha.detach().item(),
         'mean_beta':    model.mean_module.beta.detach().item(),
         'mean_gamma':   model.mean_module.gamma.detach().item(),
-        'sigma_f_morph':   model.k_morph.outputscale.detach().sqrt().item(),
-        'sigma_f_forcing': model.k_forcing.outputscale.detach().sqrt().item(),
-        **{f'ls_m_{n}': float(v)
-           for n, v in zip(morph_names, np.atleast_1d(morph_ls))},
-        **{f'ls_f_{n}': float(v)
-           for n, v in zip(forcing_names, np.atleast_1d(forcing_ls))},
+        'sigma_f_morph': model.k_morph.outputscale.detach().sqrt().item(),
     }
-    # Per-source noise floors (converted to m/s, i.e. std-dev units)
+    if n_pca is not None:
+        ls = model.k_morph.base_kernel.lengthscale.detach().squeeze().numpy()
+        hp.update({f'ls_pc{i}': float(v) for i, v in enumerate(np.atleast_1d(ls))})
+        hp['sigma_f_forcing'] = 0.0  # not used in PCA mode
+    else:
+        morph_ls   = model.k_morph.base_kernel.lengthscale.detach().squeeze().numpy()
+        forcing_ls = model.k_forcing.base_kernel.lengthscale.detach().squeeze().numpy()
+        morph_names   = [KERNEL_COLS[i] for i in morph_dims]
+        forcing_names = [KERNEL_COLS[i] for i in forcing_dims]
+        hp['sigma_f_forcing'] = model.k_forcing.outputscale.detach().sqrt().item()
+        hp.update({f'ls_m_{n}': float(v) for n, v in zip(morph_names,   np.atleast_1d(morph_ls))})
+        hp.update({f'ls_f_{n}': float(v) for n, v in zip(forcing_names, np.atleast_1d(forcing_ls))})
     for src, idx in SOURCE_MAP.items():
-        hp[f'noise_floor_{src}'] = (
-            likelihood.noise_floors[idx].detach().sqrt().item()
-        )
+        hp[f'noise_floor_{src}'] = likelihood.noise_floors[idx].detach().sqrt().item()
     return hp
 
 
@@ -446,10 +458,10 @@ for test_city in geo_cities:
 
     df_te, df_obs_all_pred, model, likelihood, scaler, \
         best_model_state, best_lik_state, noise_tr, source_idx = fit_and_predict(
-            df_tr, df_te_raw, df_obs_city
+            df_tr, df_te_raw, df_obs_city, N_PCA_COMPONENTS
         )
 
-    hp = extract_hyperparameters(model, likelihood)
+    hp = extract_hyperparameters(model, likelihood, n_pca=N_PCA_COMPONENTS)
     hp['city'] = test_city
     all_hp.append(hp)
     print_hyperparameters(hp, test_city)

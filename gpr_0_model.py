@@ -23,12 +23,16 @@ FORCING_FEATS = ['zust', 'wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se', 'ele
 n_kernel     = len(KERNEL_COLS)
 morph_dims   = [KERNEL_COLS.index(c) for c in MORPH_FEATS   if c in KERNEL_COLS]
 forcing_dims = [KERNEL_COLS.index(c) for c in FORCING_FEATS if c in KERNEL_COLS]
-zust_idx     = n_kernel + MEAN_COLS.index('zust')
-z_idx        = n_kernel + MEAN_COLS.index('height_ag')
-z0_idx       = n_kernel + MEAN_COLS.index('z0')
-zd_idx       = n_kernel + MEAN_COLS.index('zd')
-H_idx        = n_kernel + MEAN_COLS.index('mean_height')
 
+def get_mean_indices(n_kernel_input):
+    """Compute ZustMean column indices given actual kernel input width."""
+    return {
+        'zust_idx': n_kernel_input + MEAN_COLS.index('zust'),
+        'z_idx':    n_kernel_input + MEAN_COLS.index('height_ag'),
+        'z0_idx':   n_kernel_input + MEAN_COLS.index('z0'),
+        'zd_idx':   n_kernel_input + MEAN_COLS.index('zd'),
+        'H_idx':    n_kernel_input + MEAN_COLS.index('mean_height'),
+    }
 # =============================================================================
 # MODEL CLASSES
 # =============================================================================
@@ -79,23 +83,35 @@ class ZustMean(gpytorch.means.Mean):
 
 class WindGP(gpytorch.models.ExactGP):
     def __init__(self, train_x, train_y, likelihood,
-                 morph_dims, forcing_dims, zust_idx, z_idx, z0_idx, zd_idx, H_idx):
+                 morph_dims, forcing_dims, zust_idx, z_idx, z0_idx, zd_idx, H_idx, n_pca=None):
         super().__init__(train_x, train_y, likelihood)
         self.mean_module = ZustMean(zust_idx, z_idx, z0_idx, zd_idx, H_idx)
-        lsc = gpytorch.constraints.Interval(0.05, 3.0)
-        self.k_morph = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.MaternKernel(
-                nu=MATERN_NU, ard_num_dims=len(morph_dims),
-                active_dims=torch.tensor(morph_dims), lengthscale_constraint=lsc,
+        lsc = gpytorch.constraints.Interval(0.05, 1.5)
+
+        if n_pca is not None:
+            self.k_morph = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(
+                    nu=MATERN_NU, ard_num_dims=n_pca,
+                    active_dims=torch.arange(n_pca), 
+                    lengthscale_constraint=lsc,
+                )
             )
-        )
-        self.k_forcing = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.MaternKernel(
-                nu=MATERN_NU, ard_num_dims=len(forcing_dims),
-                active_dims=torch.tensor(forcing_dims), lengthscale_constraint=lsc,
+            # self.k_forcing   = gpytorch.kernels.ScaleKernel(gpytorch.kernels.ConstantKernel())  # dummy
+            self.covar_module = self.k_morph
+        else:
+            self.k_morph = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(
+                    nu=MATERN_NU, ard_num_dims=len(morph_dims),
+                    active_dims=torch.tensor(morph_dims), lengthscale_constraint=lsc,
+                )
             )
-        )
-        self.covar_module = self.k_morph + self.k_forcing
+            self.k_forcing = gpytorch.kernels.ScaleKernel(
+                gpytorch.kernels.MaternKernel(
+                    nu=MATERN_NU, ard_num_dims=len(forcing_dims),
+                    active_dims=torch.tensor(forcing_dims), lengthscale_constraint=lsc,
+                )
+            )
+            self.covar_module = self.k_morph + self.k_forcing
 
     def forward(self, x):
         return gpytorch.distributions.MultivariateNormal(
@@ -103,14 +119,22 @@ class WindGP(gpytorch.models.ExactGP):
         )
 
 
-def build_model(train_x, train_y, noise_tr, source_idx):
+def build_model(train_x, train_y, noise_tr, source_idx, n_pca=None):
     """Fresh model+likelihood with randomised lengthscale init."""
+    n_kernel_input = n_pca if n_pca is not None else n_kernel
+    idx = get_mean_indices(n_kernel_input)
     likelihood = PerSourceNoiseLikelihood(noise=noise_tr, source_idx=source_idx, n_sources=N_SOURCES)
     model = WindGP(train_x, train_y, likelihood,
-                   morph_dims, forcing_dims, zust_idx, z_idx, z0_idx, zd_idx, H_idx)
+                   morph_dims, forcing_dims,
+                   idx['zust_idx'], idx['z_idx'], idx['z0_idx'],
+                   idx['zd_idx'],   idx['H_idx'],
+                   n_pca=n_pca)
     with torch.no_grad():
-        model.k_morph.base_kernel.lengthscale   = torch.rand(1, len(morph_dims))   * 2.4 + 0.1
-        model.k_forcing.base_kernel.lengthscale = torch.rand(1, len(forcing_dims)) * 2.4 + 0.1
+        if n_pca is not None:
+            model.k_morph.base_kernel.lengthscale = torch.rand(1, n_pca) * 1.4 + 0.1
+        else:
+            model.k_morph.base_kernel.lengthscale   = torch.rand(1, len(morph_dims))   * 1.4 + 0.1
+            model.k_forcing.base_kernel.lengthscale = torch.rand(1, len(forcing_dims)) * 1.4 + 0.1
     return model, likelihood
 
 
@@ -138,3 +162,10 @@ def load_model(ckpt_path):
     scaler.scale_ = ckpt['scaler_scale']
 
     return model, likelihood, scaler, ckpt
+
+def get_pca_dims(n_pca_components):
+    """After PCA, kernel input is just n_pca_components sequential dims."""
+    all_dims    = list(range(n_pca_components))
+    # Can no longer split morph/forcing meaningfully after PCA —
+    # use a single kernel over all PCA dims instead
+    return all_dims
