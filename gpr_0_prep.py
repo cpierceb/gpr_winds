@@ -194,7 +194,7 @@ CITY_CONFIGS = {
         'era5_glob':         '../raw_data/era5/*2022*.nc',
         'june_start':        pd.Timestamp('2022-05-01', tz='UTC'),
         'june_end':          pd.Timestamp('2022-05-31 23:00:00', tz='UTC'),
-        'json_paths':        ['obs/italy/mnw_may_22.json'],
+        'json_paths':        ['../winds/obs/italy/mnw_may_22.json'],
     },
 }
 
@@ -373,28 +373,60 @@ def load_observations_mnw(cfg):
 
 
 def load_observations_zurich(cfg):
-    from xgb_a_direction import load_meteoswiss, load_meteoswiss_tower
+    def load_meteoswiss(csv_path, station_code, start_date, end_date):
+        """Load MeteoSwiss wind observations (speed + direction)"""
+        df = pd.read_csv(csv_path, sep=";", decimal=".", na_values=["", " "])
+        df['timestamp'] = pd.to_datetime(df['reference_timestamp'], format="%d.%m.%Y %H:%M")
+        df = df[df['station_abbr'] == station_code]
+        
+        start_dt = pd.to_datetime(start_date).date()
+        end_dt = pd.to_datetime(end_date).date()
+        mask = (df['timestamp'].dt.date >= start_dt) & (df['timestamp'].dt.date <= end_dt)
+        
+        df = df[mask][['timestamp', 'fkl010h0', 'dkl010h0']].copy()
+        df = df.rename(columns={'fkl010h0': 'observed_speed', 'dkl010h0': 'observed_direction'})
+        df = df.dropna()
+        
+        print(f"  Loaded {len(df)} observations (speed + direction)")
+        return df
+
+    def load_meteoswiss_tower(csv_path, station_code, start_date, end_date):
+        """Load MeteoSwiss tower wind observations (speed + direction from tower height)"""
+        df = pd.read_csv(csv_path, sep=";", decimal=".", na_values=["", " "])
+        df['timestamp'] = pd.to_datetime(df['reference_timestamp'], format="%d.%m.%Y %H:%M")
+        df = df[df['station_abbr'] == station_code]
+        
+        start_dt = pd.to_datetime(start_date).date()
+        end_dt = pd.to_datetime(end_date).date()
+        mask = (df['timestamp'].dt.date >= start_dt) & (df['timestamp'].dt.date <= end_dt)
+        
+        df = df[mask][['timestamp', 'fk1towh0', 'dk1towh0']].copy()
+        df = df.rename(columns={'fk1towh0': 'observed_speed', 'dk1towh0': 'observed_direction'})
+        df = df.dropna()
+        
+        print(f"  Loaded {len(df)} tower observations (speed + direction)")
+        return df
 
     METEOSWISS_STATIONS = {
         'SMA': {
-            'paths': ['obs/zurich/ogd-smn_sma_h_historical_2010-2019.csv',
-                      'obs/zurich/ogd-smn_sma_h_historical_2020-2029.csv'],
+            'paths': ['../winds/obs/zurich/ogd-smn_sma_h_historical_2010-2019.csv',
+                      '../winds/obs/zurich/ogd-smn_sma_h_historical_2020-2029.csv'],
             'type': 'meteoswiss',
             'lat': 47.37689, 'lon': 8.56835,
             'x': 4212616.767770121, 'y': 2697085.317715836,
             'height_ag': 10.0,
         },
         'REH': {
-            'paths': ['obs/zurich/ogd-smn_reh_h_historical_2010-2019.csv',
-                      'obs/zurich/ogd-smn_reh_h_historical_2020-2029.csv'],
+            'paths': ['../winds/obs/zurich/ogd-smn_reh_h_historical_2010-2019.csv',
+                      '../winds/obs/zurich/ogd-smn_reh_h_historical_2020-2029.csv'],
             'type': 'meteoswiss',
             'lat': 47.42529, 'lon': 8.49972,
             'x': 4209113.276438552, 'y': 2702684.8177752094,
             'height_ag': 10.0,
         },
         'UEB': {
-            'paths': ['obs/zurich/ogd-smn-tower_ueb_h_historical_2010-2019.csv',
-                      'obs/zurich/ogd-smn-tower_ueb_h_historical_2020-2029.csv'],
+            'paths': ['../winds/obs/zurich/ogd-smn-tower_ueb_h_historical_2010-2019.csv',
+                      '../winds/obs/zurich/ogd-smn-tower_ueb_h_historical_2020-2029.csv'],
             'type': 'meteoswiss_tower',
             'lat': 47.35312, 'lon': 8.49917,
             'x': 4206852.71, 'y': 2694248.38,
@@ -402,7 +434,7 @@ def load_observations_zurich(cfg):
         },
     }
 
-    df_ugz_raw = pd.read_csv('obs/zurich/ugz_ogd_meteo_h1_2018.csv')
+    df_ugz_raw = pd.read_csv('../winds/obs/zurich/ugz_ogd_meteo_h1_2018.csv')
     df_ugz = (df_ugz_raw[df_ugz_raw['Parameter'].isin(['WVv', 'WD'])]
               [['Datum', 'Standort', 'Parameter', 'Wert']]
               .assign(Wert=lambda d: pd.to_numeric(d['Wert'], errors='coerce'))
@@ -440,7 +472,7 @@ def load_observations_zurich(cfg):
 
     df_wide = pd.concat([df_ugz, *ms_frames], ignore_index=True)
 
-    with open('obs/zurich/uzg_ogd_metadaten.json') as f:
+    with open('../winds/obs/zurich/uzg_ogd_metadaten.json') as f:
         meta_json = json.load(f)
     stations_meta = {s['ID']: s for s in meta_json['Standorte']}
     for sid, scfg in METEOSWISS_STATIONS.items():
@@ -468,9 +500,9 @@ def load_observations_milan(cfg):
     start_dt = pd.to_datetime('2018-01-01')
     end_dt   = pd.to_datetime('2018-12-31') + pd.Timedelta(days=1)
 
-    df_speed_raw = pd.read_csv('obs/milan/velocita_vento_2018.csv',
+    df_speed_raw = pd.read_csv('../winds/obs/milan/velocita_vento_2018.csv',
                                 sep=';', decimal='.', encoding='latin1')
-    df_dir_raw   = pd.read_csv('obs/milan/direzione_vento_2018.csv',
+    df_dir_raw   = pd.read_csv('../winds/obs/milan/direzione_vento_2018.csv',
                                 sep=';', decimal='.', encoding='latin1')
 
     obs_frames = []

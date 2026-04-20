@@ -6,13 +6,13 @@ import os
 import rasterio
 from cmcrameri import cm
 
-
-path = 'basel'
+#change paths for nc and png as well as max height as seen on png
+path = 'zurich_4'
 os.makedirs('../winds/urban_tales/'+ path, exist_ok=True)
-max_height = 50.0
+max_height = 24.0
 
 
-ds_path = '../winds/urban_tales/'+ path +'/CH-BAS-V1_d00_ped.nc'
+ds_path = '../winds/urban_tales/'+ path +'/CH-Zur-V2_d90_ped.nc'
 
 # ── 0. Load uped (needed for domain size) ────────────────────────────────────
 ds   = xr.open_dataset(ds_path)
@@ -30,7 +30,7 @@ plt.close()
 print("Saved uped_raw.png")
 
 # ── 1. PNG → building heights, resized to PALM domain ────────────────────────
-img = Image.open('../winds/urban_tales/' + path + '/CH-BAS-V1_d00.png').convert('L')
+img = Image.open('../winds/urban_tales/' + path + '/CH-Zur-V2_d90.png').convert('L')
 arr = np.array(img)
 
 
