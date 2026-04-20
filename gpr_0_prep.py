@@ -849,3 +849,12 @@ pd.to_pickle({'df': df_train, 'meta': meta_out}, OUT_TRAIN)
 print(f"\n[5] Saved:")
 print(f"  {OUT_OBS}   ({len(df_obs)} rows)")
 print(f"  {OUT_TRAIN} ({len(df_train)} rows)")
+
+# ── CSV exports for inspection ────────────────────────────────────────────────
+csv_dir = '../winds/obs/csv'
+os.makedirs(csv_dir, exist_ok=True)
+
+df_obs.to_csv(f'{csv_dir}/gpr_obs.csv', index=False)
+df_train.to_csv(f'{csv_dir}/gpr_train_gpr.csv', index=False)
+print(f"  {csv_dir}/gpr_obs.csv       ({len(df_obs)} rows)")
+print(f"  {csv_dir}/gpr_train_gpr.csv ({len(df_train)} rows)")
