@@ -60,72 +60,28 @@ os.makedirs('obs', exist_ok=True)
 ERA5_GLOB = '../raw_data/era5/*2018*.nc'
 
 # ── Urban Tales snapshots (Zurich PALM — independent of CITIES) ───────────────
+UT_BASE = '../winds/urban_tales'
+
+def ut_paths(folder):
+    base = f'{UT_BASE}/{folder}'
+    return {
+        'uped_nc':        f'{base}/uped_30m.nc',
+        'density_tiff':   f'{base}/density_30m.tiff',
+        'height_tiff':    f'{base}/height_30m.tiff',
+        'z0_tif':         f'{base}/z0.tiff',
+        'zd_tif':         f'{base}/zd.tiff',
+        'wd_vert_tif':    f'{base}/vertical_30m.tiff',
+        'wd_diag_ne_tif': f'{base}/diag_ne_30m.tiff',
+        'wd_horiz_tif':   f'{base}/horizontal_30m.tiff',
+        'wd_diag_se_tif': f'{base}/diag_se_30m.tiff',
+    }
+
 UT_SNAPSHOTS = [
-    {
-        'uped_nc':      'urban_tales/zurich/uped_30m.nc',
-        'density_tiff': 'urban_tales/zurich/density_30m.tiff',
-        'height_tiff':  'urban_tales/zurich/height_30m.tiff',
-        'z0_tif':       'urban_tales/zurich/z0.tiff',
-        'zd_tif':       'urban_tales/zurich/zd.tiff',
-        'wd_vert_tif':    'urban_tales/zurich/vertical_30m.tiff',
-        'wd_diag_ne_tif': 'urban_tales/zurich/diag_ne_30m.tiff',
-        'wd_horiz_tif':   'urban_tales/zurich/horizontal_30m.tiff',
-        'wd_diag_se_tif': 'urban_tales/zurich/diag_se_30m.tiff',
-        'zust': 0.208309066, 'wd': 0.0,  'height_ag': 1.75,
-        'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC'),
-    },
-    {
-        'uped_nc':      'urban_tales/zurich_2/uped_30m.nc',
-        'density_tiff': 'urban_tales/zurich_2/density_30m.tiff',
-        'height_tiff':  'urban_tales/zurich_2/height_30m.tiff',
-        'z0_tif':       'urban_tales/zurich_2/z0.tiff',
-        'zd_tif':       'urban_tales/zurich_2/zd.tiff',
-        'wd_vert_tif':    'urban_tales/zurich_2/vertical_30m.tiff',
-        'wd_diag_ne_tif': 'urban_tales/zurich_2/diag_ne_30m.tiff',
-        'wd_horiz_tif':   'urban_tales/zurich_2/horizontal_30m.tiff',
-        'wd_diag_se_tif': 'urban_tales/zurich_2/diag_se_30m.tiff',
-        'zust': 0.208309066, 'wd': 90.0, 'height_ag': 1.75,
-        'timestamp': pd.Timestamp('2018-06-02 12:00:00', tz='UTC'),
-    },
-    {
-        'uped_nc':      'urban_tales/zurich_3/uped_30m.nc',
-        'density_tiff': 'urban_tales/zurich_3/density_30m.tiff',
-        'height_tiff':  'urban_tales/zurich_3/height_30m.tiff',
-        'z0_tif':       'urban_tales/zurich_3/z0.tiff',
-        'zd_tif':       'urban_tales/zurich_3/zd.tiff',
-        'wd_vert_tif':    'urban_tales/zurich_3/vertical_30m.tiff',
-        'wd_diag_ne_tif': 'urban_tales/zurich_3/diag_ne_30m.tiff',
-        'wd_horiz_tif':   'urban_tales/zurich_3/horizontal_30m.tiff',
-        'wd_diag_se_tif': 'urban_tales/zurich_3/diag_se_30m.tiff',
-        'zust': 0.207822345, 'wd': 0.0,  'height_ag': 1.75,
-        'timestamp': pd.Timestamp('2018-06-03 12:00:00', tz='UTC'),
-    },
-    {
-        'uped_nc':      'urban_tales/zurich_4/uped_30m.nc',
-        'density_tiff': 'urban_tales/zurich_4/density_30m.tiff',
-        'height_tiff':  'urban_tales/zurich_4/height_30m.tiff',
-        'z0_tif':       'urban_tales/zurich_4/z0.tiff',
-        'zd_tif':       'urban_tales/zurich_4/zd.tiff',
-        'wd_vert_tif':    'urban_tales/zurich_4/vertical_30m.tiff',
-        'wd_diag_ne_tif': 'urban_tales/zurich_4/diag_ne_30m.tiff',
-        'wd_horiz_tif':   'urban_tales/zurich_4/horizontal_30m.tiff',
-        'wd_diag_se_tif': 'urban_tales/zurich_4/diag_se_30m.tiff',
-        'zust': 0.207822345, 'wd': 90.0, 'height_ag': 1.75,
-        'timestamp': pd.Timestamp('2018-06-04 12:00:00', tz='UTC'),
-    },
-    {
-        'uped_nc':      'urban_tales/basel/uped_30m.nc',
-        'density_tiff': 'urban_tales/basel/density_30m.tiff',
-        'height_tiff':  'urban_tales/basel/height_30m.tiff',
-        'z0_tif':       'urban_tales/basel/z0.tiff',
-        'zd_tif':       'urban_tales/basel/zd.tiff',
-        'wd_vert_tif':    'urban_tales/basel/vertical_30m.tiff',
-        'wd_diag_ne_tif': 'urban_tales/basel/diag_ne_30m.tiff',
-        'wd_horiz_tif':   'urban_tales/basel/horizontal_30m.tiff',
-        'wd_diag_se_tif': 'urban_tales/basel/diag_se_30m.tiff',
-        'zust': 0.204920596, 'wd': 0.0, 'height_ag': 1.75,
-        'timestamp': pd.Timestamp('2018-06-04 12:00:00', tz='UTC'),
-    },
+    {**ut_paths('zurich'),   'zust': 0.208309066, 'wd':  0.0, 'height_ag': 1.75, 'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC')},
+    {**ut_paths('zurich_2'), 'zust': 0.208309066, 'wd': 90.0, 'height_ag': 1.75, 'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC')},
+    {**ut_paths('zurich_3'), 'zust': 0.207822345, 'wd':  0.0, 'height_ag': 1.75, 'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC')},
+    {**ut_paths('zurich_4'), 'zust': 0.207822345, 'wd': 90.0, 'height_ag': 1.75, 'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC')},
+    {**ut_paths('basel'),    'zust': 0.204920596, 'wd':  0.0, 'height_ag': 1.75, 'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC')},
 ]
 
 
@@ -358,7 +314,7 @@ def load_observations_mnw(cfg):
 
     # ── Build stations_meta ───────────────────────────────────────────────────
     stations_meta = {}
-    for _, row in df[['Standort', 'lat', 'lon', 'matched_city']].drop_duplicates().iterrows():
+    for _, row in df[['Standort', 'lat', 'lon', 'matched_city']].drop_duplicates().iterrows().dropna():
             x3035, y3035 = transformer.transform(row['lon'], row['lat'])
             stations_meta[row['Standort']] = {
                 'Koordinaten_WGS84_lat': row['lat'],
@@ -695,14 +651,14 @@ print(f"\n  Total obs (pre-ERA5): {len(df_all_obs)} rows, "
 
 def wd_to_components(wd_deg):
     
-    theta =  np.asarray(wd_deg.astype(np.float32)) % 180.0
+    theta =  np.asarray(wd_deg) % 180.0
     # scale by 45 
     seg = theta / 45.0
     # i0 and i1: the quadrants
     i0 = np.floor(seg).astype(int) % 4
     i1 = (i0 + 1) % 4
     # w0 and w1: their respective weights
-    w1 = (seg - np.floor(seg)).astype(float32) 
+    w1 = (seg - np.floor(seg)).astype(np.float32) 
     w0 = 1.0 - w1
     # match the quadrants to the bands we created
     # quadrant order is 0: horizontal, 1: ne-sw, 2: vertical, 3: se-nw

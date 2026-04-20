@@ -85,7 +85,7 @@ df_obs   = obs_obj['df'].copy()
 df_train = train_obj['df'].copy()
 meta     = train_obj['meta']
 
-USE_SOURCES = ['station', 'urban_tales']#, 'street_network']
+USE_SOURCES = ['station', 'urban_tales', 'street_network']
 FEAT_COLS = meta['feat_cols']
 TARGET    = meta['target_col']
 N_FEAT    = len(FEAT_COLS)
