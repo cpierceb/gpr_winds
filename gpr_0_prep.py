@@ -312,18 +312,29 @@ def load_observations_mnw(cfg):
 
     df = df.dropna(subset=['WVv']).reset_index(drop=True)
 
+    # ── Drop NaNs and filter by data availability ─────────────────────────────
+    df = df.dropna().reset_index(drop=True)
+
+    max_obs = df.groupby('Standort')['WVv'].count().max()
+    threshold = 0.9 * max_obs
+    valid_stations = df.groupby('Standort')['WVv'].count()
+    valid_stations = valid_stations[valid_stations >= threshold].index
+    df = df[df['Standort'].isin(valid_stations)].reset_index(drop=True)
+    print(f"  Stations after availability filter (≥90% of {max_obs}): "
+          f"{df['Standort'].nunique()} kept")
+
     # ── Build stations_meta ───────────────────────────────────────────────────
     stations_meta = {}
-    for _, row in df[['Standort', 'lat', 'lon', 'matched_city']].drop_duplicates().iterrows().dropna():
-            x3035, y3035 = transformer.transform(row['lon'], row['lat'])
-            stations_meta[row['Standort']] = {
-                'Koordinaten_WGS84_lat': row['lat'],
-                'Koordinaten_WGS84_lng': row['lon'],
-                '_x3035':       x3035,
-                '_y3035':       y3035,
-                '_height_ag':   cfg['station_height_ag'],
-                '_matched_city': row['matched_city'],
-            }
+    for _, row in df[['Standort', 'lat', 'lon', 'matched_city']].drop_duplicates().iterrows():
+        x3035, y3035 = transformer.transform(row['lon'], row['lat'])
+        stations_meta[row['Standort']] = {
+            'Koordinaten_WGS84_lat': row['lat'],
+            'Koordinaten_WGS84_lng': row['lon'],
+            '_x3035':        x3035,
+            '_y3035':        y3035,
+            '_height_ag':    cfg['station_height_ag'],
+            '_matched_city': row['matched_city'],
+        }
     print(f"  MNW final: {len(df)} rows, {df['Standort'].nunique()} stations")
     return df[['Datum', 'Standort', 'WVv', 'WD']], stations_meta
 
