@@ -15,10 +15,10 @@ MATERN_NU       = 2.5
 _INIT_RAW_FLOOR = -3.7
 
 KERNEL_COLS   = ['lambda_p', 'mean_height', 'elev_diff', 'height_ag',
-                 'zust', 'era5_sinWD', 'era5_cosWD']
+                 'zust', 'wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se']
 MEAN_COLS     = ['zust', 'height_ag', 'z0', 'zd', 'mean_height']
 MORPH_FEATS   = ['lambda_p', 'mean_height', 'height_ag']
-FORCING_FEATS = ['zust', 'era5_sinWD', 'era5_cosWD', 'elev_diff']
+FORCING_FEATS = ['zust', 'wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se', 'elev_diff']
 
 n_kernel     = len(KERNEL_COLS)
 morph_dims   = [KERNEL_COLS.index(c) for c in MORPH_FEATS   if c in KERNEL_COLS]

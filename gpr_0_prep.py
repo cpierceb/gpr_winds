@@ -41,7 +41,7 @@ JUNE_END   = pd.Timestamp('2018-06-30 23:00:00', tz='UTC')
 
 TARGET_COL = 'WVv'
 FEAT_COLS  = ['lambda_p', 'mean_height', 'elev_diff', 'height_ag',
-              'zust', 'era5_sinWD', 'era5_cosWD']
+              'zust', 'wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se']
 
 SOURCE_MAP = {
     'station':        0,
@@ -52,8 +52,8 @@ N_SOURCES = len(SOURCE_MAP)
 
 NOISE_UT = 0.1
 
-OUT_OBS   = 'obs/gpr_obs.pkl'
-OUT_TRAIN = 'obs/gpr_train_gpr.pkl'
+OUT_OBS   = '../winds/obs/gpr_obs.pkl'
+OUT_TRAIN = '../winds/obs/gpr_train_gpr.pkl'
 os.makedirs('obs', exist_ok=True)
 
 # Default ERA5 glob (2018). Cities with different years override via CITY_CONFIGS.
@@ -67,6 +67,10 @@ UT_SNAPSHOTS = [
         'height_tiff':  'urban_tales/zurich/height_30m.tiff',
         'z0_tif':       'urban_tales/zurich/z0.tiff',
         'zd_tif':       'urban_tales/zurich/zd.tiff',
+        'wd_vert_tif':    'urban_tales/zurich/vertical_30m.tiff',
+        'wd_diag_ne_tif': 'urban_tales/zurich/diag_ne_30m.tiff',
+        'wd_horiz_tif':   'urban_tales/zurich/horizontal_30m.tiff',
+        'wd_diag_se_tif': 'urban_tales/zurich/diag_se_30m.tiff',
         'zust': 0.208309066, 'wd': 0.0,  'height_ag': 1.75,
         'timestamp': pd.Timestamp('2018-06-01 12:00:00', tz='UTC'),
     },
@@ -76,6 +80,10 @@ UT_SNAPSHOTS = [
         'height_tiff':  'urban_tales/zurich_2/height_30m.tiff',
         'z0_tif':       'urban_tales/zurich_2/z0.tiff',
         'zd_tif':       'urban_tales/zurich_2/zd.tiff',
+        'wd_vert_tif':    'urban_tales/zurich_2/vertical_30m.tiff',
+        'wd_diag_ne_tif': 'urban_tales/zurich_2/diag_ne_30m.tiff',
+        'wd_horiz_tif':   'urban_tales/zurich_2/horizontal_30m.tiff',
+        'wd_diag_se_tif': 'urban_tales/zurich_2/diag_se_30m.tiff',
         'zust': 0.208309066, 'wd': 90.0, 'height_ag': 1.75,
         'timestamp': pd.Timestamp('2018-06-02 12:00:00', tz='UTC'),
     },
@@ -85,6 +93,10 @@ UT_SNAPSHOTS = [
         'height_tiff':  'urban_tales/zurich_3/height_30m.tiff',
         'z0_tif':       'urban_tales/zurich_3/z0.tiff',
         'zd_tif':       'urban_tales/zurich_3/zd.tiff',
+        'wd_vert_tif':    'urban_tales/zurich_3/vertical_30m.tiff',
+        'wd_diag_ne_tif': 'urban_tales/zurich_3/diag_ne_30m.tiff',
+        'wd_horiz_tif':   'urban_tales/zurich_3/horizontal_30m.tiff',
+        'wd_diag_se_tif': 'urban_tales/zurich_3/diag_se_30m.tiff',
         'zust': 0.207822345, 'wd': 0.0,  'height_ag': 1.75,
         'timestamp': pd.Timestamp('2018-06-03 12:00:00', tz='UTC'),
     },
@@ -94,6 +106,10 @@ UT_SNAPSHOTS = [
         'height_tiff':  'urban_tales/zurich_4/height_30m.tiff',
         'z0_tif':       'urban_tales/zurich_4/z0.tiff',
         'zd_tif':       'urban_tales/zurich_4/zd.tiff',
+        'wd_vert_tif':    'urban_tales/zurich_4/vertical_30m.tiff',
+        'wd_diag_ne_tif': 'urban_tales/zurich_4/diag_ne_30m.tiff',
+        'wd_horiz_tif':   'urban_tales/zurich_4/horizontal_30m.tiff',
+        'wd_diag_se_tif': 'urban_tales/zurich_4/diag_se_30m.tiff',
         'zust': 0.207822345, 'wd': 90.0, 'height_ag': 1.75,
         'timestamp': pd.Timestamp('2018-06-04 12:00:00', tz='UTC'),
     },
@@ -103,6 +119,10 @@ UT_SNAPSHOTS = [
         'height_tiff':  'urban_tales/basel/height_30m.tiff',
         'z0_tif':       'urban_tales/basel/z0.tiff',
         'zd_tif':       'urban_tales/basel/zd.tiff',
+        'wd_vert_tif':    'urban_tales/basel/vertical_30m.tiff',
+        'wd_diag_ne_tif': 'urban_tales/basel/diag_ne_30m.tiff',
+        'wd_horiz_tif':   'urban_tales/basel/horizontal_30m.tiff',
+        'wd_diag_se_tif': 'urban_tales/basel/diag_se_30m.tiff',
         'zust': 0.204920596, 'wd': 0.0, 'height_ag': 1.75,
         'timestamp': pd.Timestamp('2018-06-04 12:00:00', tz='UTC'),
     },
@@ -113,13 +133,22 @@ UT_SNAPSHOTS = [
 # PER-CITY CONFIG
 # =============================================================================
 
+def city_paths(city):
+    return {
+        'dtm_path':        f'../tiffs/dtm/{city}_30.tif',
+        'lambda_p_tif':    f'../tiffs/z0/{city}_lambda_p_30.tif',
+        'mean_height_tif': f'../tiffs/z0/{city}_mean_height_30.tif',
+        'z0_tif':          f'../tiffs/z0/{city}_30.tif',
+        'zd_tif':          f'../tiffs/zd/{city}_30.tif',
+        'wd_vert_tif':     f'../tiffs/dir/{city}/{city}_vertical_30m.tif',
+        'wd_diag_ne_tif':  f'../tiffs/dir/{city}/{city}_diag_ne_30m.tif',
+        'wd_horiz_tif':    f'../tiffs/dir/{city}/{city}_horizontal_30m.tif',
+        'wd_diag_se_tif':  f'../tiffs/dir/{city}/{city}_diag_se_30m.tif',
+    }
+
 CITY_CONFIGS = {
     'zurich': {
-        'dtm_path':          '../tiffs/dtm/zurich_30.tif',
-        'lambda_p_tif':      '../tiffs/z0/zurich_lambda_p_30.tif',
-        'mean_height_tif':   '../tiffs/z0/zurich_mean_height_30.tif',
-        'z0_tif':            '../tiffs/z0/zurich_30.tif',
-        'zd_tif':            '../tiffs/zd/zurich_30.tif',
+        **city_paths('zurich'),
         'station_height_ag': 10.0,
         'exclude_stations':  ['UEB'],
         'noise_map': {
@@ -133,17 +162,11 @@ CITY_CONFIGS = {
             'Zch_Rosengartenstrasse':  2.0,
             'Zch_Schimmelstrasse':     2.0,
             'Zch_Stampfenbachstrasse': 2.0,
-            # SMA and REH not listed → fall back to station_height_ag = 10.0
         },
         'noise_default': 0.2,
-        # era5_glob and june_start/end not set → fall back to module-level defaults
     },
     'milan': {
-        'dtm_path':          '../tiffs/dtm/milan_30.tif',
-        'lambda_p_tif':      '../tiffs/z0/milan_lambda_p_30.tif',
-        'mean_height_tif':   '../tiffs/z0/milan_mean_height_30.tif',
-        'z0_tif':            '../tiffs/z0/milan_30.tif',
-        'zd_tif':            '../tiffs/zd/milan_30.tif',
+        **city_paths('milan'),
         'station_height_ag': 10.0,
         'exclude_stations':  [],
         'noise_map': {
@@ -156,21 +179,14 @@ CITY_CONFIGS = {
         'noise_default': 0.3,
     },
     'rome': {
-    'dtm_path':          '../tiffs/dtm/rome_30.tif',
-    'lambda_p_tif':      '../tiffs/z0/rome_lambda_p_30.tif',
-    'mean_height_tif':   '../tiffs/z0/rome_mean_height_30.tif',
-    'z0_tif':            '../tiffs/z0/rome_30.tif',
-    'zd_tif':            '../tiffs/zd/rome_30.tif',
-    'station_height_ag': 10.0,
-    'exclude_stations':  [],
-    'noise_map':         {},
-    'noise_default':     0.2,
+        **city_paths('rome'),
+        'station_height_ag': 10.0,
+        'exclude_stations':  [],
+        'noise_map':         {},
+        'noise_default':     0.2,
     },
     'mnw': {
-        'filter_to_cities': ['milan', 'rome'],
-        # 'dtm_path':          '../tiffs/dtm/milan_30.tif',
-        # 'lambda_p_tif':      '../tiffs/z0/milan_lambda_p_30.tif',
-        # 'mean_height_tif':   '../tiffs/z0/milan_mean_height_30.tif',
+        'filter_to_cities':  ['milan', 'rome'],
         'station_height_ag': 2.0,
         'exclude_stations':  [],
         'noise_map':         {},
@@ -178,14 +194,9 @@ CITY_CONFIGS = {
         'era5_glob':         '../raw_data/era5/*2022*.nc',
         'june_start':        pd.Timestamp('2022-05-01', tz='UTC'),
         'june_end':          pd.Timestamp('2022-05-31 23:00:00', tz='UTC'),
-        'json_paths': [
-            # 'obs/mnw/wind_2022_04.json',   # ← adjust to your actual filenames
-            'obs/italy/mnw_may_22.json',
-            # 'obs/mnw/wind_2022_06.json',
-        ],
+        'json_paths':        ['obs/italy/mnw_may_22.json'],
     },
 }
-
 
 # =============================================================================
 # RASTER HELPERS
@@ -650,6 +661,28 @@ df_all_obs = pd.concat(all_obs_frames, ignore_index=True)
 print(f"\n  Total obs (pre-ERA5): {len(df_all_obs)} rows, "
       f"{df_all_obs['Standort'].nunique()} stations across {CITIES}")
 
+def wd_to_components(wd_deg):
+    
+    theta =  np.asarray(wd_deg.astype(np.float32)) % 180.0
+    # scale by 45 
+    seg = theta / 45.0
+    # i0 and i1: the quadrants
+    i0 = np.floor(seg).astype(int) % 4
+    i1 = (i0 + 1) % 4
+    # w0 and w1: their respective weights
+    w1 = (seg - np.floor(seg)).astype(float32) 
+    w0 = 1.0 - w1
+    # match the quadrants to the bands we created
+    # quadrant order is 0: horizontal, 1: ne-sw, 2: vertical, 3: se-nw
+    # band order is: 0: vertical, 1: ne-sw, 2: horizontal, 3: se-nw
+    angle_to_band = np.array([2, 1, 0, 3])
+    band0 = angle_to_band[i0]
+    band1 = angle_to_band[i1]
+    out = np.zeros((theta.size, 4), dtype = np.float32)
+    np.add.at(out, (np.arange(theta.size), band0), w0)
+    np.add.at(out, (np.arange(theta.size), band1), w1)
+
+    return out
 
 # =============================================================================
 # STEP 2 — ERA5 dynamic features: one pass per ERA5 archive (year)
@@ -700,8 +733,9 @@ era5_all = pd.concat(era5_rows, ignore_index=True)
 # the left join on (Datum, Standort) naturally keeps only matching timestamps.
 era5_all['era5_wd']    = (180 + np.degrees(
                            np.arctan2(era5_all['u10'], era5_all['v10']))) % 360
-era5_all['era5_sinWD'] = np.sin(np.deg2rad(era5_all['era5_wd']))
-era5_all['era5_cosWD'] = np.cos(np.deg2rad(era5_all['era5_wd']))
+
+wd_comps = wd_to_components(era5_all['era5_wd'].values)
+era5_all[['wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se']] = wd_comps
 era5_all = era5_all.drop(columns=['u10', 'v10', 'era5_wd'])
 print(f"  ERA5 rows total: {len(era5_all)}")
 
@@ -756,8 +790,10 @@ for i, snap in enumerate(UT_SNAPSHOTS):
         'z0':          z0_ut.ravel(),
         'zd':          zd_ut.ravel(),
         'zust':        snap['zust'],
-        'era5_sinWD':  np.sin(np.deg2rad(snap['wd'])),
-        'era5_cosWD':  np.cos(np.deg2rad(snap['wd'])),
+        **dict(zip(
+            ['wd_vert', 'wd_diag_ne', 'wd_horiz', 'wd_diag_se'],
+            wd_to_components([snap['wd']])[0]
+        )),
         'elev_diff':   0.0,
         'height_ag':   snap['height_ag'],
         'source':      'urban_tales',

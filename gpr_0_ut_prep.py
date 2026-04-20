@@ -8,11 +8,11 @@ from cmcrameri import cm
 
 
 path = 'basel'
-os.makedirs('urban_tales/'+ path, exist_ok=True)
+os.makedirs('../winds/urban_tales/'+ path, exist_ok=True)
 max_height = 50.0
 
 
-ds_path = 'urban_tales/'+ path +'/CH-BAS-V1_d00_ped.nc'
+ds_path = '../winds/urban_tales/'+ path +'/CH-BAS-V1_d00_ped.nc'
 
 # ── 0. Load uped (needed for domain size) ────────────────────────────────────
 ds   = xr.open_dataset(ds_path)
@@ -25,12 +25,12 @@ fig, ax = plt.subplots(figsize=(6, 8))
 im = ax.imshow(uped_2d, cmap='viridis', origin='upper')
 plt.colorbar(im, ax=ax, label='m/s')
 ax.set_title(f'Raw Uped ({uped_2d.shape[0]}×{uped_2d.shape[1]})')
-plt.savefig('urban_tales/' + path + '/uped_raw.png', dpi=150, bbox_inches='tight')
+plt.savefig('../winds/urban_tales/' + path + '/uped_raw.png', dpi=150, bbox_inches='tight')
 plt.close()
 print("Saved uped_raw.png")
 
 # ── 1. PNG → building heights, resized to PALM domain ────────────────────────
-img = Image.open('urban_tales/' + path + '/CH-BAS-V1_d00.png').convert('L')
+img = Image.open('../winds/urban_tales/' + path + '/CH-BAS-V1_d00.png').convert('L')
 arr = np.array(img)
 
 
@@ -68,10 +68,10 @@ height_m[map_arr_small > 250] = np.nan  # background → NaN
 fig, ax = plt.subplots(figsize=(6, 8))
 ax.imshow(map_arr_small, cmap='gray', vmin=0, vmax=255)
 ax.set_title(f'Cropped + downsampled: {map_arr_small.shape}')
-plt.savefig('urban_tales/'+ path +'/crop_check.png', dpi=150, bbox_inches='tight')
+plt.savefig('../winds/urban_tales/'+ path +'/crop_check.png', dpi=150, bbox_inches='tight')
 plt.close()
 
-Image.fromarray(height_m.astype(np.float32)).save('urban_tales/'+ path +'/building_heights.tiff')
+Image.fromarray(height_m.astype(np.float32)).save('../winds/urban_tales/'+ path +'/building_heights.tiff')
 print(f"Saved building_heights.tiff — height range: "
       f"{np.nanmin(height_m):.2f} – {np.nanmax(height_m):.2f} m")
 
@@ -92,14 +92,14 @@ ds_out = xr.Dataset({
         attrs={'long_name': 'Mean pedestrian wind speed', 'units': 'm/s', 'cell_size': '30m'}
     )
 })
-ds_out.to_netcdf('urban_tales/'+ path +'/uped_30m.nc')
-print("Saved to ", 'urban_tales/'+ path +'/uped_30m.nc')
+ds_out.to_netcdf('../winds/urban_tales/'+ path +'/uped_30m.nc')
+print("Saved to ", '../winds/urban_tales/'+ path +'/uped_30m.nc')
 
 fig, ax = plt.subplots(figsize=(5, 7))
 im = ax.imshow(uped_30m, cmap='viridis', origin='upper')
 plt.colorbar(im, ax=ax, label='m/s')
 ax.set_title('Uped 30m mean')
-plt.savefig('urban_tales/'+ path +'/uped_30m.png', dpi=150, bbox_inches='tight')
+plt.savefig('../winds/urban_tales/'+ path +'/uped_30m.png', dpi=150, bbox_inches='tight')
 plt.close()
 
 # ── 2. Coarsen building height → density + mean height at 30m ────────────────
@@ -122,8 +122,8 @@ height_30m = np.where(
 print(f"Density range: {density_30m.min():.2f} – {density_30m.max():.2f}")
 print(f"Height range:  {height_30m.min():.2f} – {height_30m.max():.2f} m")
 
-Image.fromarray(density_30m.astype(np.float32)).save('urban_tales/'+ path +'/density_30m.tiff')
-Image.fromarray(height_30m.astype(np.float32)).save('urban_tales/'+ path +'/height_30m.tiff')
+Image.fromarray(density_30m.astype(np.float32)).save('../winds/urban_tales/'+ path +'/density_30m.tiff')
+Image.fromarray(height_30m.astype(np.float32)).save('../winds/urban_tales/'+ path +'/height_30m.tiff')
 print("Saved density_30m.tiff, height_30m.tiff")
 
 for data, title, cmap, fname, label in [
@@ -134,7 +134,7 @@ for data, title, cmap, fname, label in [
     im = ax.imshow(data, cmap=cmap, origin='upper')
     plt.colorbar(im, ax=ax, label=label)
     ax.set_title(title)
-    plt.savefig('urban_tales/'+ path +f'/{fname}', dpi=150, bbox_inches='tight')
+    plt.savefig('../winds/urban_tales/'+ path +f'/{fname}', dpi=150, bbox_inches='tight')
     plt.close()
     print(f"Saved {fname}")
 
@@ -161,10 +161,10 @@ def calculate_roughness_simple_30m(output_resolution=30, input_resolution=10,
     """Calculate roughness parameters at 30m from 10m inputs"""
 
 
-    with rasterio.open('urban_tales/'+ path +'/density_30m.tiff') as lp:
+    with rasterio.open('../winds/urban_tales/'+ path +'/density_30m.tiff') as lp:
         lambda_p_combined = lp.read(1)
     
-    with rasterio.open('urban_tales/'+ path +'/height_30m.tiff') as mh:
+    with rasterio.open('../winds/urban_tales/'+ path +'/height_30m.tiff') as mh:
         mh_30 = mh.read(1)
     
 
@@ -184,9 +184,9 @@ def calculate_roughness_simple_30m(output_resolution=30, input_resolution=10,
     print(f"  ✓ lambda_p_combined range: {lambda_p_combined.min():.4f} - {lambda_p_combined.max():.4f}")
     print(f"  ✓ Mean height range:       {mh_30.min():.2f} - {mh_30.max():.2f} m")
 
-    quick_plot(lambda_p_combined,  'Plan area fraction λp [-]',    'urban_tales/'+ path + '/lambda_p_combined.png')
-    quick_plot(lambda_f_combined,  'Frontal area fraction λf [-]', 'urban_tales/'+ path + '/lambda_f_combined.png')
-    quick_plot(mh_30,              'Mean height [m]',              'urban_tales/'+ path + '/mh_30.png')
+    quick_plot(lambda_p_combined,  'Plan area fraction λp [-]',    '../winds/urban_tales/'+ path + '/lambda_p_combined.png')
+    quick_plot(lambda_f_combined,  'Frontal area fraction λf [-]', '../winds/urban_tales/'+ path + '/lambda_f_combined.png')
+    quick_plot(mh_30,              'Mean height [m]',              '../winds/urban_tales/'+ path + '/mh_30.png')
 
 
 
@@ -219,13 +219,13 @@ def calculate_roughness_simple_30m(output_resolution=30, input_resolution=10,
         z0[has_roughness] = z0_rough
         zd[has_roughness] = zd_rough
 
-    quick_plot(z0,              'Roughness length [m]',              'urban_tales/'+ path + '/z0.png')
-    quick_plot(zd,              'Displacement height[m]',            'urban_tales/'+ path + '/zd.png')
+    quick_plot(z0,              'Roughness length [m]',              '../winds/urban_tales/'+ path + '/z0.png')
+    quick_plot(zd,              'Displacement height[m]',            '../winds/urban_tales/'+ path + '/zd.png')
 
 
 
     with rasterio.open(
-        'urban_tales/'+ path +'/z0.tiff',
+        '../winds/urban_tales/'+ path +'/z0.tiff',
         'w',
         driver='GTiff',
         height=z0.shape[0],
@@ -238,7 +238,7 @@ def calculate_roughness_simple_30m(output_resolution=30, input_resolution=10,
         dst.write(z0, 1)
 
     with rasterio.open(
-        'urban_tales/'+ path +'/zd.tiff',
+        '../winds/urban_tales/'+ path +'/zd.tiff',
         'w',
         driver='GTiff',
         height=zd.shape[0],
@@ -255,3 +255,47 @@ def calculate_roughness_simple_30m(output_resolution=30, input_resolution=10,
 
 
 z0, zd = calculate_roughness_simple_30m()
+
+
+
+# ── 3. Direction bands at native resolution → coarsened to 30m ───────────────
+bool_mask = np.where(np.isnan(height_m), 0, (height_m > 10).astype(np.uint8))
+
+# Coarsen 1m boolean mask to 10m (any building in 10x10 block → 1)
+nr_10 = bool_mask.shape[0] // 10
+nc_10 = bool_mask.shape[1] // 10
+bool_mask_10m = (bool_mask[:nr_10*10, :nc_10*10]
+                 .reshape(nr_10, 10, nc_10, 10)
+                 .max(axis=(1, 3))
+                 .astype(np.uint8))
+
+# Neighbor check at 10m resolution
+data      = bool_mask_10m
+c         = data[1:-1, 1:-1]
+top       = data[0:-2, 1:-1];  bottom    = data[2:,   1:-1]
+left      = data[1:-1, 0:-2];  right     = data[1:-1, 2:  ]
+top_left  = data[0:-2, 0:-2];  top_right = data[0:-2, 2:  ]
+bot_left  = data[2:,   0:-2];  bot_right = data[2:,   2:  ]
+
+mask_0    = (c == 0)
+dir_bands = np.zeros((4, *c.shape), dtype=np.uint8)
+dir_bands[0] = np.where(mask_0 & (top == 0)      & (bottom == 0),    1, 0)
+dir_bands[1] = np.where(mask_0 & (bot_left == 0) & (top_right == 0), 1, 0)
+dir_bands[2] = np.where(mask_0 & (left == 0)     & (right == 0),     1, 0)
+dir_bands[3] = np.where(mask_0 & (top_left == 0) & (bot_right == 0), 1, 0)
+
+# Coarsen to 30m by summing 3x3 blocks → max value 9
+nr_d = dir_bands.shape[1] // 3
+nc_d = dir_bands.shape[2] // 3
+
+for i, name in enumerate(['vertical', 'diag_ne', 'horizontal', 'diag_se']):
+    coarsened = (dir_bands[i, :nr_d*3, :nc_d*3]
+                 .reshape(nr_d, 3, nc_d, 3)
+                 .sum(axis=(1, 3))
+                 .astype(np.uint8))
+    out_path = f'../winds/urban_tales/{path}/{name}_30m.tiff'
+    with rasterio.open(out_path, 'w', driver='GTiff',
+                       height=coarsened.shape[0], width=coarsened.shape[1],
+                       count=1, dtype=coarsened.dtype) as dst:
+        dst.write(coarsened, 1)
+    print(f"Saved {out_path}  shape={coarsened.shape}  max={coarsened.max()}")

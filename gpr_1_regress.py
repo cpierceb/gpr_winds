@@ -44,7 +44,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 from scipy.stats import pearsonr
 from cmcrameri import cm as cmc
-from gpr_model import (
+from gpr_0_model import (
     SOURCE_MAP, N_SOURCES, KERNEL_COLS, MEAN_COLS,
     morph_dims, forcing_dims, zust_idx, z_idx, z0_idx, zd_idx, H_idx,
     PerSourceNoiseLikelihood, WindGP, build_model, load_model,
@@ -54,9 +54,9 @@ from gpr_model import (
 # CONFIG
 # =============================================================================
 
-OBS_PATH   = 'obs/gpr_obs.pkl'
-TRAIN_PATH = 'obs/gpr_train_gpr.pkl'
-PLOT_DIR   = 'plots/gpr_wind'
+OBS_PATH   = '../winds/obs/gpr_obs.pkl'
+TRAIN_PATH = '../winds/obs/gpr_train_gpr.pkl'
+PLOT_DIR   = '../winds/plots/gpr_wind'
 os.makedirs(PLOT_DIR, exist_ok=True)
 
 N_ITER      = 2500
@@ -89,9 +89,6 @@ USE_SOURCES = ['station', 'urban_tales']#, 'street_network']
 FEAT_COLS = meta['feat_cols']
 TARGET    = meta['target_col']
 N_FEAT    = len(FEAT_COLS)
-
-MORPH_FEATS   = ['lambda_p', 'mean_height', 'height_ag']
-FORCING_FEATS = ['zust', 'era5_sinWD', 'era5_cosWD', 'elev_diff']
 
 
 print(f"k_morph   dims : {[FEAT_COLS[i] for i in morph_dims]}")
@@ -169,7 +166,7 @@ def fit_and_predict(df_tr, df_te, df_obs_station):
     for restart in range(N_RESTARTS):
         print(f"  Restart {restart + 1}/{N_RESTARTS} …")
 
-        model, likelihood = _build_model(train_x, train_y, noise_tr, source_idx)
+        model, likelihood = build_model(train_x, train_y, noise_tr, source_idx)
         model.train(); likelihood.train()
         optimizer = Adam(model.parameters(), lr=LR)
         mll       = ExactMarginalLogLikelihood(likelihood, model)
@@ -414,7 +411,7 @@ geo_cities = sorted(
 print(f"City folds : {geo_cities}")
 
 # Hardcoded
-geo_cities = {'zurich'}
+# geo_cities = {'zurich'}
 
 all_results = []
 all_hp      = []
