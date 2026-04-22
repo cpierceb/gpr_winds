@@ -277,10 +277,7 @@ def extract_hyperparameters(model, likelihood, n_pca=None):
     return hp
 
 
-def print_hyperparameters(hp, station_id):
-    morph_names   = [FEAT_COLS[i] for i in morph_dims]
-    forcing_names = [FEAT_COLS[i] for i in forcing_dims]
-
+def print_hyperparameters(hp, station_id, n_pca=None):
     def _bar(val, max_val):
         return '█' * max(1, round(val / max_val * 20))
 
@@ -298,16 +295,26 @@ def print_hyperparameters(hp, station_id):
             print(f"  │    {src:<20}  σ = {hp[key]:.4f}")
     print(f"  │")
     print(f"  │  k_morph  σ_f = {hp['sigma_f_morph']:.4f} m/s")
-    m_vals = [hp[f'ls_m_{n}'] for n in morph_names]
-    max_m  = max(m_vals) if m_vals else 1.0
-    for n, v in zip(morph_names, m_vals):
-        print(f"  │    {n:<18}  ℓ = {v:6.4f}  {_bar(v, max_m)}")
-    print(f"  │")
-    print(f"  │  k_forcing  σ_f = {hp['sigma_f_forcing']:.4f} m/s")
-    f_vals = [hp[f'ls_f_{n}'] for n in forcing_names]
-    max_f  = max(f_vals) if f_vals else 1.0
-    for n, v in zip(forcing_names, f_vals):
-        print(f"  │    {n:<18}  ℓ = {v:6.4f}  {_bar(v, max_f)}")
+
+    if n_pca is not None:
+        ls_vals = [hp[f'ls_pc{i}'] for i in range(n_pca) if f'ls_pc{i}' in hp]
+        max_ls  = max(ls_vals) if ls_vals else 1.0
+        for i, v in enumerate(ls_vals):
+            print(f"  │    PC{i:<17}  ℓ = {v:6.4f}  {_bar(v, max_ls)}")
+    else:
+        morph_names   = [KERNEL_COLS[i] for i in morph_dims]
+        forcing_names = [KERNEL_COLS[i] for i in forcing_dims]
+        m_vals = [hp[f'ls_m_{n}'] for n in morph_names]
+        max_m  = max(m_vals) if m_vals else 1.0
+        for n, v in zip(morph_names, m_vals):
+            print(f"  │    {n:<18}  ℓ = {v:6.4f}  {_bar(v, max_m)}")
+        print(f"  │")
+        print(f"  │  k_forcing  σ_f = {hp['sigma_f_forcing']:.4f} m/s")
+        f_vals = [hp[f'ls_f_{n}'] for n in forcing_names]
+        max_f  = max(f_vals) if f_vals else 1.0
+        for n, v in zip(forcing_names, f_vals):
+            print(f"  │    {n:<18}  ℓ = {v:6.4f}  {_bar(v, max_f)}")
+
     print(f"  └{'─'*55}")
 
 
@@ -464,8 +471,8 @@ for test_city in geo_cities:
     hp = extract_hyperparameters(model, likelihood, n_pca=N_PCA_COMPONENTS)
     hp['city'] = test_city
     all_hp.append(hp)
-    print_hyperparameters(hp, test_city)
-
+    print_hyperparameters(hp, test_city, n_pca=N_PCA_COMPONENTS)   
+     
     # Metrics per station within the held-out city
     print(f"\n  Per-station metrics ({test_city}):")
     city_results = []
